@@ -15,6 +15,7 @@ interface TenantData {
   businessName: string;
   timezone: string;
   businessHours: { start: string; end: string; days: number[] };
+  calendlyUrl?: string;
   aiConfig: {
     systemPrompt?: string;
     qualificationCriteria: any[];
@@ -70,12 +71,13 @@ export function buildSystemPrompt(
   // Audit leads get special instructions that reference their report
   // Keep audit instructions active until the conversation moves to booking/closed
   if (isAuditLead && context.state !== 'booking' && context.state !== 'closed') {
-    parts.push(buildAuditLeadInstructions(context));
+    parts.push(buildAuditLeadInstructions(context, tenant.calendlyUrl));
   } else {
     parts.push(buildStateInstructions(
       context.state,
       tenant.aiConfig.qualificationCriteria,
       tenant.aiConfig.greeting,
+      tenant.calendlyUrl,
     ));
   }
 
@@ -224,6 +226,7 @@ function buildStateInstructions(
   state: ConversationState,
   qualificationCriteria: any[],
   customGreeting?: string,
+  calendlyUrl?: string,
 ): string {
   switch (state) {
     case 'greeting':
@@ -233,12 +236,27 @@ function buildStateInstructions(
       return buildQualifyingInstructions(qualificationCriteria);
 
     case 'qualified':
+      if (calendlyUrl) {
+        return `## Fase Atual: Qualificado
+O contato foi qualificado positivamente. Ofereça agendar uma conversa/reunião com um especialista.
+Envie o link de agendamento: ${calendlyUrl}
+Diga algo como: "Para agendar no melhor horário para você, é só escolher aqui: ${calendlyUrl}"
+Mude o estado para "booking" quando enviar o link.
+Se o contato recusar o agendamento, seja compreensivo, ofereça enviar mais informações e mantenha a porta aberta.`;
+      }
       return `## Fase Atual: Qualificado
 O contato foi qualificado positivamente. Ofereça agendar uma conversa/reunião com um especialista.
 Pergunte qual o melhor dia e horário. Mude o estado para "booking" quando o contato aceitar agendar.
 Se o contato recusar o agendamento, seja compreensivo, ofereça enviar mais informações e mantenha a porta aberta.`;
 
     case 'booking':
+      if (calendlyUrl) {
+        return `## Fase Atual: Agendamento
+O contato recebeu o link de agendamento (${calendlyUrl}).
+Se ele ainda não agendou, envie o link novamente e incentive a escolher um horário.
+Se ele confirmar que agendou pelo link, mude o estado para "closed" e agradeça.
+NÃO tente coletar data/hora manualmente — o agendamento é feito pelo Calendly.`;
+      }
       return `## Fase Atual: Agendamento
 O contato quer agendar. Sugira 2-3 horários disponíveis nos próximos dias úteis.
 Confirme data e horário escolhidos. Mude o estado para "closed" quando o agendamento for confirmado.
@@ -256,9 +274,17 @@ Se o contato quiser agendar novamente ou tiver nova demanda, mude o estado para 
  * Instead of greeting from scratch, the AI should reference the audit report
  * that was already sent and guide toward booking a consultation.
  */
-function buildAuditLeadInstructions(context: ConversationContext): string {
+function buildAuditLeadInstructions(context: ConversationContext, calendlyUrl?: string): string {
   const score = context.extractedData?.auditScore;
   const siteUrl = context.extractedData?.siteUrl;
+
+  const bookingInstruction = calendlyUrl
+    ? `3. Envie o link de agendamento: "Nosso consultor pode te ajudar a implementar isso. Agende no melhor horário pra você: ${calendlyUrl}"\n4. Mude nextState para "booking"`
+    : `3. Direcione IMEDIATAMENTE para o agendamento: "Nosso consultor pode te ajudar a implementar isso. Quer agendar uma conversa rápida? Qual o melhor dia e horário pra você?"\n4. Mude nextState para "booking"`;
+
+  const bookingExample = calendlyUrl
+    ? `"Excelente escolha! Ativar WhatsApp + telefone clicável pode aumentar suas conversões em até 40%. Nosso consultor pode implementar isso rapidamente. Agende no melhor horário pra você: ${calendlyUrl}"`
+    : `"Excelente escolha! Ativar WhatsApp + telefone clicável pode aumentar suas conversões em até 40%. Nosso consultor pode implementar isso rapidamente no seu site. Quer agendar uma conversa? Qual dia e horário ficam melhor pra você?"`;
 
   return `## Fase Atual: Follow-up da Auditoria
 
@@ -274,15 +300,14 @@ SEU ÚNICO OBJETIVO: Levar o contato a agendar uma conversa com um consultor.
 Como responder:
 1. Confirme brevemente o item que o contato mencionou (1 frase curta)
 2. Reforce o valor/impacto dessa melhoria com base no relatório (1 frase)
-3. Direcione IMEDIATAMENTE para o agendamento: "Nosso consultor pode te ajudar a implementar isso. Quer agendar uma conversa rápida? Qual o melhor dia e horário pra você?"
-4. Mude nextState para "booking"
+${bookingInstruction}
 
 Se o contato fizer perguntas sobre o relatório, responda brevemente e SEMPRE volte ao agendamento.
-Se o contato aceitar agendar, colete dia e horário preferidos.
+${calendlyUrl ? `Se o contato aceitar agendar, envie o link novamente: ${calendlyUrl}` : 'Se o contato aceitar agendar, colete dia e horário preferidos.'}
 Se o contato recusar, seja compreensivo e mantenha a porta aberta.
 
 EXEMPLO DE BOA RESPOSTA:
-"Excelente escolha! Ativar WhatsApp + telefone clicável pode aumentar suas conversões em até 40%. Nosso consultor pode implementar isso rapidamente no seu site. Quer agendar uma conversa? Qual dia e horário ficam melhor pra você?"
+${bookingExample}
 
 EXEMPLO DE RESPOSTA RUIM (NÃO FAÇA ISSO):
 "Ótimo! Você já tem um site pronto ou está começando agora?"`;

@@ -10,6 +10,7 @@ import { registerAnalyticsRoutes } from './modules/analytics/analytics.routes';
 import { registerTrainingRoutes } from './modules/training/training.routes';
 import { registerWebhookRoutes } from './modules/whatsapp/webhook.handler';
 import { registerAuditLeadRoutes } from './modules/whatsapp/audit-lead.handler';
+import { registerCalendlyWebhookRoutes } from './modules/booking/calendly.handler';
 import { env } from './config/env';
 import { evolutionConfig } from './config/evolution';
 import { prisma } from './config/database';
@@ -172,6 +173,7 @@ export async function buildApp() {
 
   app.register(async (instance) => registerWebhookRoutes(instance));
   app.register(async (instance) => registerAuditLeadRoutes(instance));
+  app.register(async (instance) => registerCalendlyWebhookRoutes(instance));
   app.register(async (instance) => registerTenantRoutes(instance));
   app.register(async (instance) => registerBookingRoutes(instance));
   app.register(async (instance) => registerCampaignRoutes(instance));

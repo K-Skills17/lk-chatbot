@@ -25,6 +25,10 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().optional(),
 
+  // Google Sheets (Service Account — simpler than OAuth)
+  GOOGLE_SHEETS_CLIENT_EMAIL: z.string().optional(),
+  GOOGLE_SHEETS_PRIVATE_KEY: z.string().optional(),
+
   WEBHOOK_BASE_URL: z.string().default('http://localhost:3000'),
 });
 

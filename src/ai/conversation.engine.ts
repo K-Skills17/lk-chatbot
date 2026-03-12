@@ -8,6 +8,7 @@ import { buildQualificationPrompt } from './prompts/qualification.prompt';
 import { bookingService } from '../modules/booking/booking.service';
 import { campaignService } from '../modules/campaign/campaign.service';
 import { notificationService } from '../modules/notification/notification.service';
+import { getSheetsClient } from '../modules/sheets/sheets.client';
 import {
   MessageJobData,
   AiMessage,
@@ -97,11 +98,13 @@ export async function processMessage(job: MessageJobData): Promise<void> {
   const history = await loadHistory(conversationId);
 
   // 8. Build system prompt (pass full aiConfig for business knowledge base)
+  const bookingCfg = tenant.bookingConfig as Record<string, any> | null;
   const systemPrompt = buildSystemPrompt(
     {
       businessName: tenant.businessName,
       timezone: tenant.timezone,
       businessHours: tenant.businessHours as { start: string; end: string; days: number[] },
+      calendlyUrl: bookingCfg?.calendlyUrl,
       aiConfig: {
         systemPrompt: aiConfig.systemPrompt,
         qualificationCriteria: aiConfig.qualificationCriteria ?? [],
@@ -567,6 +570,37 @@ async function applySideEffects(
   // Track campaign funnel progression
   if (action.leadStatus === 'qualified' || action.leadStatus === 'booked') {
     await trackCampaignFunnel(contactId, action.leadStatus);
+  }
+
+  // Export lead to Google Sheets if configured
+  if (action.leadStatus === 'qualified' || action.leadStatus === 'booked') {
+    try {
+      const tenantData = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { bookingConfig: true },
+      });
+      const sheetsClient = getSheetsClient(tenantData?.bookingConfig);
+      if (sheetsClient) {
+        const contactData = await prisma.contact.findUnique({ where: { id: contactId } });
+        if (contactData) {
+          await sheetsClient.ensureHeaders();
+          await sheetsClient.appendLead({
+            date: new Date().toLocaleDateString('pt-BR'),
+            name: contactData.name ?? '',
+            phone: contactData.phone,
+            email: contactData.email ?? undefined,
+            leadScore: action.leadScore ?? contactData.leadScore,
+            leadStatus: action.leadStatus,
+            source: updatedContext.extractedData?.source ?? 'whatsapp',
+            qualificationData: contactData.qualificationData
+              ? JSON.stringify(contactData.qualificationData)
+              : undefined,
+          });
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, 'Failed to export lead to Google Sheets');
+    }
   }
 
   // Send notifications (non-blocking)
