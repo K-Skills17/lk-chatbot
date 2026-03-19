@@ -10,7 +10,10 @@ export function registerWebChatRoutes(app: FastifyInstance): void {
   // ── Embeddable widget script ──────────────────────────────
   app.get('/api/webchat/:tenantId/widget.js', async (request, reply) => {
     const { tenantId } = request.params as { tenantId: string };
-    const baseUrl = env.WEBHOOK_BASE_URL;
+    // Derive base URL from the actual request when WEBHOOK_BASE_URL is the default localhost
+    const baseUrl = env.WEBHOOK_BASE_URL && !env.WEBHOOK_BASE_URL.includes('localhost')
+      ? env.WEBHOOK_BASE_URL
+      : `${request.protocol}://${request.hostname}`;
     const script = getWidgetScript(tenantId, baseUrl);
     return reply
       .type('application/javascript')

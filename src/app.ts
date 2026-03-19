@@ -203,11 +203,15 @@ export async function buildApp() {
   // Web chat widget — open CORS so any site can embed it.
   // We use a preHandler hook instead of registering @fastify/cors again,
   // because Fastify does not allow the corsPreflightEnabled decorator twice.
+  // We also remove the restrictive CSP headers that Helmet adds, since the
+  // widget script runs on third-party sites and must fetch back to our API.
   app.register(async (instance) => {
     instance.addHook('preHandler', async (request, reply) => {
       reply.header('Access-Control-Allow-Origin', '*');
       reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       reply.header('Access-Control-Allow-Headers', 'Content-Type');
+      // Remove CSP so the widget can run on any embedding site
+      reply.removeHeader('Content-Security-Policy');
       if (request.method === 'OPTIONS') {
         return reply.code(204).send();
       }
