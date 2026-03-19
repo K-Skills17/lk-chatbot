@@ -47,6 +47,20 @@ export async function buildApp() {
 
   // ─── Plugins ──────────────────────────────────────────────
 
+  // Intercept webchat OPTIONS preflight BEFORE the CORS plugin can reject
+  // them. The CORS plugin handles OPTIONS in onRequest, which runs before
+  // any child-scope preHandler, so we must handle it here at the root.
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.url.startsWith('/api/webchat/')) {
+      if (request.method === 'OPTIONS') {
+        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        reply.header('Access-Control-Allow-Headers', 'Content-Type');
+        return reply.code(204).send();
+      }
+    }
+  });
+
   await app.register(cors, {
     origin: env.NODE_ENV === 'production'
       ? [env.WEBHOOK_BASE_URL, `${env.WEBHOOK_BASE_URL}/portal`]
@@ -201,20 +215,19 @@ export async function buildApp() {
   app.register(async (instance) => registerAdminRoutes(instance));
 
   // Web chat widget — open CORS so any site can embed it.
-  // We use a preHandler hook instead of registering @fastify/cors again,
-  // because Fastify does not allow the corsPreflightEnabled decorator twice.
-  // We also remove the restrictive CSP headers that Helmet adds, since the
-  // widget script runs on third-party sites and must fetch back to our API.
+  // We use an onSend hook (runs AFTER the root @fastify/cors plugin) so we
+  // can reliably override the restrictive CORS and CSP headers.  Preflight
+  // OPTIONS are already handled by the root onRequest hook above.
   app.register(async (instance) => {
-    instance.addHook('preHandler', async (request, reply) => {
+    instance.addHook('onSend', async (_request, reply, payload) => {
       reply.header('Access-Control-Allow-Origin', '*');
       reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       reply.header('Access-Control-Allow-Headers', 'Content-Type');
-      // Remove CSP so the widget can run on any embedding site
+      // credentials:true + origin:* is invalid per CORS spec — remove it
+      reply.removeHeader('Access-Control-Allow-Credentials');
+      // Remove CSP so the widget script can run on any embedding site
       reply.removeHeader('Content-Security-Policy');
-      if (request.method === 'OPTIONS') {
-        return reply.code(204).send();
-      }
+      return payload;
     });
     registerWebChatRoutes(instance);
   });
