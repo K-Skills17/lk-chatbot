@@ -48,17 +48,16 @@ export async function buildApp() {
 
   // ─── Plugins ──────────────────────────────────────────────
 
-  await app.register(cors, {
-    delegator: (req, callback) => {
-      // Webchat widget routes must be embeddable on any site
+  // Per-request CORS: open for /api/webchat/*, restricted for everything else
+  await app.register(cors, (_instance: any) => {
+    return (req: any, callback: any) => {
       if (req.url.startsWith('/api/webchat/')) {
         return callback(null, {
-          origin: true,
+          origin: '*',
           methods: ['GET', 'POST', 'OPTIONS'],
           credentials: false,
         });
       }
-      // All other routes: restrict to our own domain in production
       callback(null, {
         origin: env.NODE_ENV === 'production'
           ? [env.WEBHOOK_BASE_URL, `${env.WEBHOOK_BASE_URL}/portal`]
@@ -66,7 +65,7 @@ export async function buildApp() {
         methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
         credentials: true,
       });
-    },
+    };
   });
 
   await app.register(helmet, {
