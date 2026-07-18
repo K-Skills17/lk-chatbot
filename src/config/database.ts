@@ -12,9 +12,11 @@ function getPrisma(): PrismaClient {
     if (!env.DATABASE_URL) {
       throw new Error('DATABASE_URL is not configured');
     }
-    // Append schema=lk_chatbot so our tables don't collide with Evolution API's public schema
+    // Append schema=lk_chatbot so our tables don't collide with Evolution API's public schema.
+    // Cap connection pool at 5 — both this app and Evolution API share the same Railway
+    // PostgreSQL instance, so we must leave headroom to avoid P2037 "too many clients".
     const sep = env.DATABASE_URL.includes('?') ? '&' : '?';
-    const url = `${env.DATABASE_URL}${sep}schema=lk_chatbot`;
+    const url = `${env.DATABASE_URL}${sep}schema=lk_chatbot&connection_limit=5`;
     _prisma = new PrismaClient({
       datasourceUrl: url,
     });
