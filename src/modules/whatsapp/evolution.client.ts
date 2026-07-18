@@ -186,17 +186,20 @@ export class EvolutionClient {
 
   /** Set webhook URL for an instance */
   async setWebhook(instanceName: string, webhookUrl: string): Promise<void> {
+    // Evolution API v2 requires the payload wrapped under a "webhook" key
     await this.http.post(`/webhook/set/${instanceName}`, {
-      enabled: true,
-      url: webhookUrl,
-      headers: { apikey: evolutionConfig.apiKey },
-      webhookByEvents: false,
-      webhookBase64: false,
-      events: [
-        'MESSAGES_UPSERT',
-        'MESSAGES_UPDATE',
-        'CONNECTION_UPDATE',
-      ],
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        headers: { apikey: evolutionConfig.apiKey },
+        webhookByEvents: false,
+        webhookBase64: false,
+        events: [
+          'MESSAGES_UPSERT',
+          'MESSAGES_UPDATE',
+          'CONNECTION_UPDATE',
+        ],
+      },
     });
 
     logger.info({ instanceName, webhookUrl }, 'Webhook configured');
