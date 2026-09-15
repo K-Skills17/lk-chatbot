@@ -45,6 +45,9 @@ const envSchema = z.object({
   STRIPE_PRO_PRICE_ID: z.string().optional(),
   STRIPE_ENTERPRISE_PRICE_ID: z.string().optional(),
 
+  // Telegram notifications (optional)
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+
   // Diagnostic tool integration
   DIAGNOSTIC_WEBHOOK_SECRET: z.string().optional(),
 

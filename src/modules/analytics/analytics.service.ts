@@ -50,37 +50,55 @@ export interface DailyMetric {
 
 export class AnalyticsService {
   /** Get full dashboard overview for a tenant */
-  async getOverview(tenantId: string): Promise<DashboardOverview> {
-    const [contacts, conversations, bookings, campaigns] = await Promise.all([
+  async getOverview(tenantId: string) {
+    const [contacts, conversations, bookings, campaigns, tenant] = await Promise.all([
       this.getContactStats(tenantId),
       this.getConversationStats(tenantId),
       this.getBookingStats(tenantId),
       this.getCampaignStats(tenantId),
+      prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { monthlyAiCostUsd: true, aiCostLimitUsd: true, messagesThisMonth: true },
+      }),
     ]);
 
-    return { contacts, conversations, bookings, campaigns };
+    const conversionRate =
+      contacts.total > 0 ? (contacts.qualified + contacts.booked) / contacts.total : 0;
+
+    return {
+      totalConversations: conversations.total,
+      totalContacts: contacts.total,
+      totalBookings: bookings.total,
+      conversionRate,
+      messagesLast30Days: tenant?.messagesThisMonth ?? 0,
+      monthlyAiCost: tenant?.monthlyAiCostUsd ?? 0,
+      aiCostLimit: tenant?.aiCostLimitUsd ?? 0,
+      contacts,
+      conversations,
+      bookings,
+      campaigns,
+    };
   }
 
-  /** Get lead funnel breakdown */
-  async getLeadFunnel(tenantId: string): Promise<LeadFunnel[]> {
+  /** Get lead funnel breakdown — returns flat object matching Dashboard.tsx */
+  async getLeadFunnel(tenantId: string) {
     const statusCounts = await prisma.contact.groupBy({
       by: ['leadStatus'],
       where: { tenantId, optedOut: false },
       _count: true,
     });
 
-    const total = statusCounts.reduce((sum, row) => sum + row._count, 0);
-    const stages = ['new', 'qualifying', 'qualified', 'booked', 'lost'];
+    const countMap: Record<string, number> = {};
+    for (const row of statusCounts) {
+      countMap[row.leadStatus] = row._count;
+    }
 
-    return stages.map((stage) => {
-      const row = statusCounts.find((r) => r.leadStatus === stage);
-      const count = row?._count ?? 0;
-      return {
-        stage,
-        count,
-        percentage: total > 0 ? Math.round((count / total) * 100) : 0,
-      };
-    });
+    return {
+      newContacts: countMap['new'] ?? 0,
+      qualifying: countMap['qualifying'] ?? 0,
+      qualified: countMap['qualified'] ?? 0,
+      booked: countMap['booked'] ?? 0,
+    };
   }
 
   /** Get daily metrics for the last N days */

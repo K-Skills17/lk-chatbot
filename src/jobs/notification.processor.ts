@@ -10,7 +10,7 @@ interface NotificationJobData {
   notificationId: string;
   tenantId: string;
   type: string;
-  channel: 'whatsapp' | 'email' | 'webhook';
+  channel: 'whatsapp' | 'email' | 'webhook' | 'telegram';
   recipient: string;
   content: string;
 }
@@ -28,6 +28,9 @@ export async function notificationProcessor(job: Job<NotificationJobData>): Prom
         break;
       case 'webhook':
         await sendWebhookNotification(recipient, job.data);
+        break;
+      case 'telegram':
+        await sendTelegramNotification(recipient, content);
         break;
     }
 
@@ -121,6 +124,24 @@ async function sendEmailNotification(
     subject: subjectMap[type] ?? 'Notificação',
     text: content,
   });
+}
+
+async function sendTelegramNotification(
+  chatId: string,
+  content: string,
+): Promise<void> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    const { logger } = await import('../utils/logger');
+    logger.warn('Telegram notification skipped — TELEGRAM_BOT_TOKEN not configured');
+    return;
+  }
+
+  await axios.post(
+    `https://api.telegram.org/bot${botToken}/sendMessage`,
+    { chat_id: chatId, text: content, parse_mode: 'Markdown' },
+    { timeout: 10_000 },
+  );
 }
 
 async function sendWebhookNotification(

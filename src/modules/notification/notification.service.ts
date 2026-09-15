@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger';
 import { getNotificationQueue } from '../../jobs/queue.setup';
 
 export type NotificationType = 'new_lead' | 'booking' | 'escalation' | 'daily_summary';
-export type NotificationChannel = 'whatsapp' | 'email' | 'webhook';
+export type NotificationChannel = 'whatsapp' | 'email' | 'webhook' | 'telegram';
 
 interface NotifyInput {
   tenantId: string;
@@ -145,6 +145,17 @@ export class NotificationService {
         type,
         channel: 'webhook',
         recipient: notifyConfig.webhookUrl,
+        content,
+      });
+    }
+
+    // Telegram notification
+    if (notifyConfig.telegramChatId) {
+      await this.notify({
+        tenantId,
+        type,
+        channel: 'telegram',
+        recipient: String(notifyConfig.telegramChatId),
         content,
       });
     }
