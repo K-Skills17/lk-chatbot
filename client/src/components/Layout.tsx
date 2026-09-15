@@ -15,13 +15,13 @@ import {
 import { useState } from 'react'
 
 const NAV_ITEMS = [
-  { to: '/portal', icon: LayoutDashboard, label: 'Painel', end: true },
-  { to: '/portal/bookings', icon: CalendarDays, label: 'Agendamentos' },
-  { to: '/portal/leads', icon: Users, label: 'Leads' },
-  { to: '/portal/reviews', icon: Star, label: 'Avaliacoes' },
-  { to: '/portal/campaigns', icon: Megaphone, label: 'Campanhas' },
-  { to: '/portal/billing', icon: CreditCard, label: 'Cobranca' },
-  { to: '/portal/settings', icon: Settings, label: 'Configuracoes' },
+  { to: '/', icon: LayoutDashboard, label: 'Painel', end: true },
+  { to: '/bookings', icon: CalendarDays, label: 'Agendamentos' },
+  { to: '/leads', icon: Users, label: 'Leads' },
+  { to: '/reviews', icon: Star, label: 'Avaliacoes' },
+  { to: '/campaigns', icon: Megaphone, label: 'Campanhas' },
+  { to: '/billing', icon: CreditCard, label: 'Cobranca' },
+  { to: '/settings', icon: Settings, label: 'Configuracoes' },
 ]
 
 export default function Layout() {
@@ -31,7 +31,7 @@ export default function Layout() {
 
   const handleLogout = () => {
     logout()
-    navigate('/portal/login')
+    navigate('/login')
   }
 
   const sidebar = (

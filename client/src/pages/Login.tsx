@@ -12,7 +12,7 @@ export default function Login() {
 
   // Redirect if already logged in
   if (token) {
-    navigate('/portal', { replace: true })
+    navigate('/', { replace: true })
     return null
   }
 
@@ -21,7 +21,7 @@ export default function Login() {
     setError('')
     try {
       await login(email, password)
-      navigate('/portal', { replace: true })
+      navigate('/', { replace: true })
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login')
     }
