@@ -1,12 +1,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { tenantPortalHtml } from '../../views/tenant-portal';
 
 export function registerPortalRoutes(app: FastifyInstance): void {
-  // Serve the tenant self-service portal (no auth — login handled client-side)
+  // Redirect old HTML portal URLs to the React SPA login page
   app.get(
     '/portal/:tenantId',
     async (_request: FastifyRequest<{ Params: { tenantId: string } }>, reply: FastifyReply) => {
-      return reply.type('text/html').send(tenantPortalHtml());
+      return reply.redirect('/portal/login', 301);
     },
   );
 }
