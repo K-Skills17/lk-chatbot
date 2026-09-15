@@ -1,11 +1,5 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 
-export function registerPortalRoutes(app: FastifyInstance): void {
-  // Redirect old HTML portal URLs to the React SPA login page
-  app.get(
-    '/portal/:tenantId',
-    async (_request: FastifyRequest<{ Params: { tenantId: string } }>, reply: FastifyReply) => {
-      return reply.redirect('/portal/login', 301);
-    },
-  );
-}
+// Portal routes are handled by the static file server and SPA fallback in app.ts.
+// All /portal/* requests serve the React SPA (client/dist/index.html).
+export function registerPortalRoutes(_app: FastifyInstance): void {}
