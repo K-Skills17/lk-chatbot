@@ -66,6 +66,7 @@ export const createTenantSchema = z.object({
       ownerPhone: z.string().optional(),
       ownerEmail: z.string().optional(),
       webhookUrl: z.string().optional(),
+      telegramChatId: z.string().optional(),
     })
     .optional(),
   plan: z.enum(['starter', 'pro', 'enterprise']).default('starter'),

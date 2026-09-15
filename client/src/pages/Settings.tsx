@@ -25,6 +25,16 @@ export default function Settings() {
   const [newRole, setNewRole] = useState('staff')
   const [addError, setAddError] = useState('')
 
+  // Notification config form
+  const [notifPhone, setNotifPhone] = useState('')
+  const [notifEmail, setNotifEmail] = useState('')
+  const [notifTelegram, setNotifTelegram] = useState('')
+  const [notifNewLead, setNotifNewLead] = useState(true)
+  const [notifBooking, setNotifBooking] = useState(true)
+  const [notifEscalation, setNotifEscalation] = useState(true)
+  const [notifMsg, setNotifMsg] = useState('')
+  const [notifError, setNotifError] = useState('')
+
   const fetchData = () => {
     const promises: Promise<any>[] = [tenantApi.get()]
     if (user?.role === 'owner') promises.push(authApi.listUsers())
@@ -33,6 +43,13 @@ export default function Settings() {
       .then(([t, u]) => {
         setTenantData(t)
         if (u) setUsers(u.users || [])
+        const nc = t?.notificationConfig || {}
+        setNotifPhone(nc.ownerPhone || '')
+        setNotifEmail(nc.ownerEmail || '')
+        setNotifTelegram(nc.telegramChatId || '')
+        setNotifNewLead(nc.newLead !== false)
+        setNotifBooking(nc.booking !== false)
+        setNotifEscalation(nc.escalation !== false)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -79,6 +96,27 @@ export default function Settings() {
     if (!confirm('Remover este usuario?')) return
     await authApi.deleteUser(userId)
     fetchData()
+  }
+
+  const handleSaveNotifications = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setNotifMsg('')
+    setNotifError('')
+    try {
+      await tenantApi.update({
+        notificationConfig: {
+          newLead: notifNewLead,
+          booking: notifBooking,
+          escalation: notifEscalation,
+          ownerPhone: notifPhone || undefined,
+          ownerEmail: notifEmail || undefined,
+          telegramChatId: notifTelegram || undefined,
+        },
+      })
+      setNotifMsg('Configuracoes salvas!')
+    } catch (err: any) {
+      setNotifError(err.message || 'Erro ao salvar')
+    }
   }
 
   if (loading) {
@@ -260,6 +298,83 @@ export default function Settings() {
           </div>
         </Card>
       )}
+
+      {/* Notification config */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Notificacoes de Leads</h2>
+        <form onSubmit={handleSaveNotifications} className="max-w-md space-y-4">
+          {notifMsg && (
+            <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">{notifMsg}</p>
+          )}
+          {notifError && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{notifError}</p>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Telegram Chat ID
+            </label>
+            <input
+              type="text"
+              value={notifTelegram}
+              onChange={(e) => setNotifTelegram(e.target.value)}
+              placeholder="Ex: -1001234567890"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+            <p className="text-xs text-gray-400 mt-1">Mande uma mensagem para @userinfobot no Telegram para obter seu Chat ID</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              WhatsApp do Responsavel (com codigo do pais)
+            </label>
+            <input
+              type="text"
+              value={notifPhone}
+              onChange={(e) => setNotifPhone(e.target.value)}
+              placeholder="Ex: 5511999999999"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email do Responsavel</label>
+            <input
+              type="email"
+              value={notifEmail}
+              onChange={(e) => setNotifEmail(e.target.value)}
+              placeholder="voce@email.com"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-700">Notificar quando:</p>
+            {[
+              { label: 'Novo lead', value: notifNewLead, set: setNotifNewLead },
+              { label: 'Novo agendamento', value: notifBooking, set: setNotifBooking },
+              { label: 'Escalacao para humano', value: notifEscalation, set: setNotifEscalation },
+            ].map(({ label, value, set }) => (
+              <label key={label} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={value}
+                  onChange={(e) => set(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{label}</span>
+              </label>
+            ))}
+          </div>
+
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Salvar Notificacoes
+          </button>
+        </form>
+      </Card>
     </div>
   )
 }
