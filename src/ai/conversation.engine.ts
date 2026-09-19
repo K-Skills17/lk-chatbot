@@ -20,6 +20,7 @@ import {
   ConversationContext,
   ModelTier,
 } from './ai.types';
+import { syncToOutreach } from '../utils/outreach-sync';
 
 // ── Plan Limits ──────────────────────────────────────────────
 const PLAN_LIMITS: Record<string, { messagesPerMonth: number | null; aiCostMonthlyUsd: number | null }> = {
@@ -80,6 +81,7 @@ export async function processMessage(job: MessageJobData): Promise<void> {
   if (text && isOptOut(text)) {
     await handleOptOut(tenantId, contactId, conversationId, tenant.evolutionInstanceId!, phone);
     await insertEvent(tenantId, contactId, 'opt_out', { phone });
+    syncToOutreach(phone, 'opted_out').catch(() => {});
     return;
   }
 
@@ -357,6 +359,14 @@ export async function processMessage(job: MessageJobData): Promise<void> {
 
   // 21. Apply side effects (update conversation, contact, notifications)
   await applySideEffects(tenantId, conversationId, contactId, phone, context, aiAction, envelope.stage);
+
+  // 21b. Sync key funnel events back to the outreach engine (fire-and-forget)
+  if (aiAction.leadStatus === 'booked') {
+    syncToOutreach(phone, 'call_booked').catch(() => {});
+  } else if (context.messageCount === 0) {
+    // First AI response = prospect replied — mark as replied in outreach DB
+    syncToOutreach(phone, 'replied').catch(() => {});
+  }
 
   // 22. Increment monthly message counter for plan enforcement
   await incrementMessageCount(tenantId);

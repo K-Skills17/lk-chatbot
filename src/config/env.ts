@@ -56,6 +56,10 @@ const envSchema = z.object({
   // Concierge debounce & webhook auth
   DEBOUNCE_MS: z.coerce.number().default(10000),
   WEBHOOK_SHARED_SECRET: z.string().optional(),
+
+  // Outreach engine sync — when set, chatbot notifies the outreach DB of reply/booking events
+  OUTREACH_SYNC_URL: z.string().optional(),    // e.g. https://lk-outreach.vercel.app/api/internal/prospect-sync
+  OUTREACH_SYNC_SECRET: z.string().optional(), // must match INTERNAL_WEBHOOK_SECRET in outreach Vercel env
 });
 
 function loadEnv() {
