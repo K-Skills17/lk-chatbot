@@ -84,6 +84,25 @@ export async function campaignProcessor(job: Job<CampaignSendJobData>): Promise<
         },
       },
     });
+  } else {
+    // Existing conversation: stamp campaign context so the AI knows this is outbound
+    const existingCtx = (conversation.context as Record<string, any>) ?? {};
+    if (!existingCtx.extractedData?.source) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          context: {
+            ...existingCtx,
+            extractedData: {
+              ...(existingCtx.extractedData ?? {}),
+              source: 'campaign',
+              campaignId,
+              campaignMessage: text,
+            },
+          },
+        },
+      });
+    }
   }
 
   // 7. Send message

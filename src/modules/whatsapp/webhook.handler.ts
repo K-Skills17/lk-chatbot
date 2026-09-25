@@ -154,11 +154,29 @@ async function handleIncomingMessage(instanceName: string, data: MessageData): P
         typeof contact.qualificationData === 'object' &&
         (contact.qualificationData as Record<string, any>).audit;
 
+      // Check if this contact was recently messaged by a campaign (within 7 days)
+      const recentCampaignSend = await prisma.campaignContact.findFirst({
+        where: {
+          contactId: contact.id,
+          status: { in: ['sent', 'replied'] },
+          sentAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          campaign: { tenantId: tenant.id },
+        },
+        include: { campaign: { select: { id: true, messageTemplate: true } } },
+        orderBy: { sentAt: 'desc' },
+      });
+
       const initialState = contact.leadStatus === 'new' ? 'greeting' : 'qualifying';
       const initialExtractedData = hasAuditData
         ? {
             source: 'audit_tool',
             ...((contact.qualificationData as Record<string, any>).audit ?? {}),
+          }
+        : recentCampaignSend
+        ? {
+            source: 'campaign',
+            campaignId: recentCampaignSend.campaign.id,
+            campaignMessage: recentCampaignSend.campaign.messageTemplate,
           }
         : {};
 
