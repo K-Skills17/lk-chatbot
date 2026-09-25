@@ -120,6 +120,7 @@ export function buildSystemPrompt(
   const isAuditLead = context.extractedData?.source === 'audit_tool' ||
     (context as any).auditReportSent === true;
   const isFacebookLead = context.extractedData?.source === 'facebook_lead_ad';
+  const isCampaignLead = context.extractedData?.source === 'campaign';
 
   parts.push(buildIdentity(tenant.businessName, tenant.aiConfig.tone));
   parts.push(buildSalesFramework(tenant.aiConfig));
@@ -143,6 +144,8 @@ export function buildSystemPrompt(
   // Keep audit instructions active until the conversation moves to booking/closed
   if (isAuditLead && context.state !== 'booking' && context.state !== 'closed') {
     parts.push(buildAuditLeadInstructions(context, tenant.aiConfig));
+  } else if (isCampaignLead && context.state !== 'booking' && context.state !== 'closed') {
+    parts.push(buildCampaignOutreachInstructions(context, tenant.aiConfig));
   } else if (isFacebookLead && context.state !== 'booking' && context.state !== 'closed') {
     parts.push(buildFacebookLeadInstructions(context));
   } else {
@@ -508,6 +511,42 @@ EXEMPLO DE RESPOSTA RUIM (NÃO FAÇA ISSO):
 /**
  * Special instructions for leads from Facebook lead ad forms.
  */
+function buildCampaignOutreachInstructions(
+  context: ConversationContext,
+  aiConfig: TenantData["aiConfig"],
+): string {
+  const campaignMessage = context.extractedData?.campaignMessage as string | undefined;
+  const messageRef = campaignMessage
+    ? 'Mensagem enviada: \"' + campaignMessage + '\"'
+    : '(conteudo da mensagem nao disponivel)';
+
+  let qualifySection = '';
+  if (aiConfig.qualificationCriteria && aiConfig.qualificationCriteria.length > 0) {
+    const criteria = (aiConfig.qualificationCriteria as any[]).map((c) => '- ' + c).join('\n');
+    qualifySection = '\n\n## Qualificacao\nUse a conversa para descobrir, uma pergunta por vez:\n' + criteria;
+  }
+
+  return [
+    '## Contexto: Campanha de Prospeccao Ativa',
+    '',
+    'REGRAS CRITICAS:',
+    '- VOCE entrou em contato primeiro. Esta pessoa NAO te encontrou - voce a abordou.',
+    '- ' + messageRef,
+    '- A primeira mensagem JA apresentou o negocio e o motivo do contato.',
+    '- NAO se apresente novamente como se ela tivesse entrado em contato do zero.',
+    '- NAO pergunte \"como posso te ajudar?\" - voce ja disse o motivo do contato.',
+    '- Se ela respondeu com interesse, agradeca e siga a conversa naturalmente.',
+    '- Se ela respondeu com uma pergunta, responda diretamente e avance para qualificacao.',
+    '- Se ela respondeu com ceticismo ou objecao, acolha e mostre o valor brevemente.',
+    '- Seja objetivo: 2-3 frases por mensagem, sem floreios.',
+    '',
+    '## Fluxo Esperado',
+    '1. Reconheca a resposta dela (nao repita a apresentacao)',
+    '2. Faca UMA pergunta de qualificacao ou oferca o proximo passo',
+    '3. Se mostrar interesse, oferca agendar uma conversa rapida' + qualifySection,
+  ].join('\n');
+}
+
 function buildFacebookLeadInstructions(context: ConversationContext): string {
   const scoring = context.extractedData?.formScoring;
 

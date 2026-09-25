@@ -92,6 +92,12 @@ async function handleIncomingMessage(instanceName: string, data: MessageData): P
   const phone = fromWhatsAppJid(data.key.remoteJid);
   const text = extractTextContent(data);
   const messageType = detectMessageType(data);
+
+  // Skip automatic replies (OOO, vacation responders) — do not engage with bot messages
+  if (text && isAutoReply(text)) {
+    logger.info({ phone, text: text.slice(0, 80) }, 'Auto-reply detected — skipping AI processing');
+    return;
+  }
   const senderName = data.pushName ?? null;
 
   // Find the tenant by Evolution instance
@@ -394,4 +400,30 @@ function detectMessageType(data: MessageData): string {
   if (data.message.buttonsResponseMessage) return 'interactive';
   if (data.message.listResponseMessage) return 'interactive';
   return 'unknown';
+}
+
+/**
+ * Detect automatic/OOO replies so we don't process them through AI.
+ * These arrive when someone's phone has an auto-responder active.
+ */
+function isAutoReply(text: string): boolean {
+  const patterns = [
+    /mensagem\s+autom[aá]tica/i,
+    /resposta\s+autom[aá]tica/i,
+    /aviso\s+autom[aá]ti/i,
+    /gerado?\s+automaticamente/i,
+    /fora\s+do\s+escrit[oó]rio/i,
+    /out\s+of\s+(the\s+)?office/i,
+    /auto[- ]?reply/i,
+    /automatic\s+reply/i,
+    /automated\s+(response|reply|message)/i,
+    /this\s+is\s+an\s+automated/i,
+    /i\s+am\s+(currently\s+)?unavailable/i,
+    /n[aã]o\s+estou\s+dispon[ií]vel\s+no\s+momento/i,
+    /estou\s+em\s+viagem/i,
+    /responderei\s+(assim\s+que\s+poss[ií]vel|quando\s+retornar)/i,
+    /do\s+not\s+reply\s+to\s+this/i,
+    /n[aã]o\s+responda\s+a?\s*este\s+(e-?mail|mensagem)/i,
+  ];
+  return patterns.some(p => p.test(text));
 }

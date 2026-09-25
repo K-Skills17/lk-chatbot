@@ -78,7 +78,7 @@ export async function campaignProcessor(job: Job<CampaignSendJobData>): Promise<
         status: 'active',
         context: {
           state: 'greeting',
-          extractedData: { source: 'campaign', campaignId },
+          extractedData: { source: 'campaign', campaignId, campaignMessage: text },
           qualificationComplete: false,
           messageCount: 0,
         },
