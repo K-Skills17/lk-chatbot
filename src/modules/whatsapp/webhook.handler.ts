@@ -123,6 +123,12 @@ async function handleIncomingMessage(instanceName: string, data: MessageData): P
     },
   });
 
+  // Skip AI intake for outreach contacts — handled by turma1_reply_watcher
+  if (contact.tags.includes('outreach')) {
+    logger.info({ phone }, 'Outreach contact — skipping intake bot');
+    return;
+  }
+
   // Track campaign replies (non-blocking)
   await trackCampaignReply(tenant.id, contact.id);
 

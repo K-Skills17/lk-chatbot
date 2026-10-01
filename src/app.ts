@@ -23,6 +23,7 @@ import { registerAdminRoutes } from './modules/admin/admin.routes';
 import { registerWebChatRoutes } from './modules/webchat/webchat.routes';
 import { registerDiagnosticWebhookRoutes } from './modules/diagnostic/diagnostic.webhook';
 import { registerLeadIntakeRoutes } from './modules/lead-intake/lead-intake.routes';
+import { registerOutreachRoutes } from './modules/whatsapp/outreach.routes';
 import { env } from './config/env';
 import { evolutionConfig } from './config/evolution';
 import { prisma } from './config/database';
@@ -270,6 +271,7 @@ export async function buildApp() {
   app.register(async (instance) => registerWebhookRoutes(instance));
   app.register(async (instance) => registerFacebookWebhookRoutes(instance));
   app.register(async (instance) => registerAuditLeadRoutes(instance));
+  app.register(async (instance) => registerOutreachRoutes(instance));
   app.register(async (instance) => registerTenantRoutes(instance));
   app.register(async (instance) => registerBookingRoutes(instance));
   app.register(async (instance) => registerCampaignRoutes(instance));
