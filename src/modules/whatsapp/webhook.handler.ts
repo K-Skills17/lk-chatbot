@@ -77,6 +77,14 @@ export function registerWebhookRoutes(app: FastifyInstance): void {
 const HUMAN_TAKEOVER_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 async function handleIncomingMessage(instanceName: string, data: MessageData): Promise<void> {
+  // Block outreach-only instances before any DB work — no race conditions possible.
+  // Set OUTREACH_INSTANCE_IDS=id1,id2 in Railway env to exclude those instances entirely.
+  const outreachInstances = (process.env.OUTREACH_INSTANCE_IDS ?? '').split(',').filter(Boolean);
+  if (outreachInstances.includes(instanceName)) {
+    logger.debug({ instanceName }, 'Outreach-only instance — skipping intake bot entirely');
+    return;
+  }
+
   // Detect human operator messages (sent from the WhatsApp app, not the bot)
   // Ignore group messages — only process private (1-to-1) chats
   if (data.key.remoteJid.endsWith('@g.us')) {
