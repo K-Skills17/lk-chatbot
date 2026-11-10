@@ -8,6 +8,7 @@ import {
   Megaphone,
   CreditCard,
   Settings,
+  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const isSuperadmin = user?.role === 'superadmin'
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -64,6 +66,22 @@ export default function Layout() {
             {label}
           </NavLink>
         ))}
+        {isSuperadmin && (
+          <NavLink
+            to="/admin"
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-purple-50 text-purple-700'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`
+            }
+          >
+            <ShieldCheck className="w-5 h-5 shrink-0" />
+            Admin
+          </NavLink>
+        )}
       </div>
 
       {/* User footer */}

@@ -126,3 +126,31 @@ export const tenant = {
   update: (data: any) =>
     request<any>(t(''), { method: 'PATCH', body: JSON.stringify(data) }),
 }
+
+// ─── Portal Admin (superadmin only) ──────────────
+export const portalAdmin = {
+  listTenants: () =>
+    request<{ tenants: any[] }>('/api/portal-admin/tenants'),
+  createTenant: (data: {
+    businessName: string;
+    whatsappNumber: string;
+    portalEmail: string;
+    portalPassword: string;
+    plan?: string;
+    businessType?: string;
+  }) =>
+    request<any>('/api/portal-admin/tenants', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateTenant: (tenantId: string, data: { status?: string; plan?: string; businessType?: string; whatsappNumber?: string }) =>
+    request<any>(`/api/portal-admin/tenants/${tenantId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  upsertPortalUser: (tenantId: string, data: { email: string; password: string; name?: string }) =>
+    request<any>(`/api/portal-admin/tenants/${tenantId}/portal-user`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+}

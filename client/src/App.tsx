@@ -9,6 +9,7 @@ import Reviews from './pages/Reviews'
 import Campaigns from './pages/Campaigns'
 import Billing from './pages/Billing'
 import Settings from './pages/Settings'
+import Admin from './pages/Admin'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth()
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="campaigns" element={<Campaigns />} />
         <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="admin" element={<Admin />} />
       </Route>
     </Routes>
   )
