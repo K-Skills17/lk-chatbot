@@ -101,6 +101,11 @@ async function handleIncomingMessage(instanceName: string, data: MessageData): P
   const text = extractTextContent(data);
   const messageType = detectMessageType(data);
 
+  // Extract image metadata when the client sends a photo
+  const imageMessageKey = data.message?.imageMessage ? data.key : undefined;
+  const imageMimeType = data.message?.imageMessage?.mimetype ?? undefined;
+  const imageThumbnailBase64 = data.message?.imageMessage?.jpegThumbnail ?? undefined;
+
   // Skip automatic replies (OOO, vacation responders) — do not engage with bot messages
   if (text && isAutoReply(text)) {
     logger.info({ phone, text: text.slice(0, 80) }, 'Auto-reply detected — skipping AI processing');
@@ -279,6 +284,9 @@ async function handleIncomingMessage(instanceName: string, data: MessageData): P
     text,
     messageType,
     senderName,
+    ...(imageMessageKey && { imageMessageKey }),
+    ...(imageMimeType && { imageMimeType }),
+    ...(imageThumbnailBase64 && { imageThumbnailBase64 }),
   }, {
     jobId: debounceJobId,
     delay: DEBOUNCE_MS,

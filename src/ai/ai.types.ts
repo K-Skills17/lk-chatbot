@@ -80,4 +80,10 @@ export interface MessageJobData {
   text: string | null;
   messageType: string;
   senderName: string | null;
+  /** Present when messageType === 'image' — used to fetch full media from Evolution API */
+  imageMessageKey?: { remoteJid: string; fromMe: boolean; id: string };
+  /** MIME type reported by WhatsApp for the image (e.g. 'image/jpeg') */
+  imageMimeType?: string;
+  /** Base64 thumbnail included in the webhook payload (low-res fallback) */
+  imageThumbnailBase64?: string;
 }

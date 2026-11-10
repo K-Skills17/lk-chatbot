@@ -1,4 +1,5 @@
 import { ConversationState, ConversationContext } from '../ai.types';
+import { getPromptForNiche } from '../vision/visual.prompt';
 
 interface ServiceInfo {
   name: string;
@@ -123,6 +124,14 @@ export function buildSystemPrompt(
   const isCampaignLead = context.extractedData?.source === 'campaign';
 
   parts.push(buildIdentity(tenant.businessName, tenant.aiConfig.tone));
+
+  // Inject niche-specific instructions when businessType is set (hairstylist, tattoo, nail_studio, makeup, etc.)
+  const businessType = (tenant.aiConfig as any).businessType as string | undefined;
+  if (businessType) {
+    const { botInstructions } = getPromptForNiche(businessType);
+    parts.push(botInstructions);
+  }
+
   parts.push(buildSalesFramework(tenant.aiConfig));
 
   // Custom business instructions (free-form prompt from the business owner)

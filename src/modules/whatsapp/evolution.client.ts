@@ -182,6 +182,38 @@ export class EvolutionClient {
     return data;
   }
 
+  // ─── Media ───────────────────────────────────────────────
+
+  /**
+   * Fetches the base64-encoded content of a media message (image, audio, document)
+   * from the Evolution API. Required because WhatsApp encrypts media on CDN.
+   * Returns null if the fetch fails or the message is not a media message.
+   */
+  async getMediaBase64(
+    instanceName: string,
+    messageKey: { remoteJid: string; fromMe: boolean; id: string },
+  ): Promise<{ base64: string; mimetype: string } | null> {
+    try {
+      const { data } = await this.http.post(
+        `/chat/getBase64FromMediaMessage/${instanceName}`,
+        { message: { key: messageKey } },
+        { timeout: 20_000 },
+      );
+
+      const base64: string = data?.base64 ?? data?.data?.base64 ?? '';
+      const mimetype: string = data?.mimetype ?? data?.mediaType ?? 'image/jpeg';
+
+      if (!base64) return null;
+      return { base64, mimetype };
+    } catch (err: any) {
+      logger.warn(
+        { instanceName, messageId: messageKey.id, err: err?.message },
+        'Failed to fetch media base64 from Evolution API',
+      );
+      return null;
+    }
+  }
+
   // ─── Webhook Configuration ──────────────────────────────
 
   /** Set webhook URL for an instance */

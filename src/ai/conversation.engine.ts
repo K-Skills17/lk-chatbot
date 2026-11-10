@@ -3,6 +3,7 @@ import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { sendMessage } from '../modules/whatsapp/message.sender';
+import { evolutionClient } from '../modules/whatsapp/evolution.client';
 import { getProvider, getModelForTier } from './ai.router';
 import { buildSystemPrompt } from './prompts/system.prompt';
 import { buildQualificationPrompt } from './prompts/qualification.prompt';
@@ -13,6 +14,7 @@ import { reviewService } from '../modules/review/review.service';
 import { parseEnvelope, ConciergeEnvelope } from '../concierge/envelope';
 import { runComplianceGate, SAFE_HANDOFF_REPLY, ComplianceResult } from '../concierge/compliance';
 import { scoreQualification, QualificationRules, QualificationData } from '../concierge/qualification';
+import { analyzeVisualReference, formatAnalysisForConversation } from './vision/visual.analyzer';
 import {
   MessageJobData,
   AiMessage,
@@ -121,9 +123,18 @@ export async function processMessage(job: MessageJobData): Promise<void> {
     }
   }
 
-  // 6. Handle non-text messages
+  // 6. Handle non-text messages — with visual reference analysis for image messages
   const aiConfig = tenant.aiConfig as Record<string, any>;
-  const effectiveText = resolveMessageText(text, messageType);
+  let effectiveText = resolveMessageText(text, messageType);
+
+  if (messageType === 'image') {
+    effectiveText = await resolveImageMessage(
+      job,
+      tenant.evolutionInstanceId ?? null,
+      aiConfig.businessType as string | undefined,
+      effectiveText,
+    );
+  }
 
   // 7. Load recent conversation history
   const history = await loadHistory(conversationId);
@@ -476,6 +487,55 @@ function resolveMessageText(text: string | null, messageType: string): string {
     case 'document': return '[O contato enviou um documento]';
     default: return '[O contato enviou uma mensagem nao-textual]';
   }
+}
+
+/**
+ * When a client sends a photo, fetch the full image from Evolution API and
+ * run Claude Vision analysis using the niche-specific prompt for this tenant.
+ *
+ * Falls back to the webhook thumbnail if the full image fetch fails,
+ * and falls back to a plain text placeholder if neither is available.
+ */
+async function resolveImageMessage(
+  job: MessageJobData,
+  instanceName: string | null,
+  businessType: string | undefined,
+  fallbackText: string,
+): Promise<string> {
+  if (!instanceName) return fallbackText;
+
+  let imageBase64: string | null = null;
+  let imageMimeType = 'image/jpeg';
+
+  // 1. Try to fetch full image via Evolution API
+  if (job.imageMessageKey) {
+    const media = await evolutionClient.getMediaBase64(instanceName, job.imageMessageKey);
+    if (media) {
+      imageBase64 = media.base64;
+      imageMimeType = media.mimetype;
+    }
+  }
+
+  // 2. Fall back to thumbnail included in the webhook payload
+  if (!imageBase64 && job.imageThumbnailBase64) {
+    imageBase64 = job.imageThumbnailBase64;
+    imageMimeType = job.imageMimeType ?? 'image/jpeg';
+    logger.info('Using webhook thumbnail for visual analysis (full image fetch failed)');
+  }
+
+  if (!imageBase64) {
+    logger.warn('No image data available — falling back to text placeholder');
+    return fallbackText;
+  }
+
+  // 3. Run visual reference analysis via Claude Vision
+  const analysis = await analyzeVisualReference(imageBase64, imageMimeType, businessType);
+  if (!analysis) return fallbackText;
+
+  const analysisText = formatAnalysisForConversation(analysis, businessType);
+
+  // Prepend any caption text the client may have sent with the photo
+  return job.text ? `${job.text}\n\n${analysisText}` : analysisText;
 }
 
 async function loadHistory(conversationId: string): Promise<AiMessage[]> {
