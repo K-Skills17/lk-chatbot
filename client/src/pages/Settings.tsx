@@ -5,6 +5,20 @@ import Card from '../components/Card'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
 
+const BUSINESS_TYPES = [
+  { value: '', label: 'Generico (qualquer negocio)' },
+  { value: 'hairstylist', label: 'Salao de Cabelo / Trancista' },
+  { value: 'tattoo', label: 'Estudio de Tatuagem' },
+  { value: 'nail_studio', label: 'Estudio de Unhas' },
+  { value: 'makeup', label: 'Maquiagem' },
+]
+
+const TONES = [
+  { value: 'friendly', label: 'Amigavel e profissional' },
+  { value: 'casual', label: 'Descontraido (como um amigo)' },
+  { value: 'formal', label: 'Formal e respeitoso' },
+]
+
 export default function Settings() {
   const { user } = useAuth()
   const [tenantData, setTenantData] = useState<any>(null)
@@ -35,6 +49,14 @@ export default function Settings() {
   const [notifMsg, setNotifMsg] = useState('')
   const [notifError, setNotifError] = useState('')
 
+  // Bot / AI config form
+  const [botType, setBotType] = useState('')
+  const [botTone, setBotTone] = useState('friendly')
+  const [botDescription, setBotDescription] = useState('')
+  const [botGreeting, setBotGreeting] = useState('')
+  const [botMsg, setBotMsg] = useState('')
+  const [botError, setBotError] = useState('')
+
   const fetchData = () => {
     const promises: Promise<any>[] = [tenantApi.get()]
     if (user?.role === 'owner') promises.push(authApi.listUsers())
@@ -50,6 +72,11 @@ export default function Settings() {
         setNotifNewLead(nc.newLead !== false)
         setNotifBooking(nc.booking !== false)
         setNotifEscalation(nc.escalation !== false)
+        const ac = t?.aiConfig || {}
+        setBotType(ac.businessType || '')
+        setBotTone(ac.tone || 'friendly')
+        setBotDescription(ac.businessDescription || '')
+        setBotGreeting(ac.greeting || '')
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -96,6 +123,25 @@ export default function Settings() {
     if (!confirm('Remover este usuario?')) return
     await authApi.deleteUser(userId)
     fetchData()
+  }
+
+  const handleSaveBotConfig = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBotMsg('')
+    setBotError('')
+    try {
+      await tenantApi.update({
+        aiConfig: {
+          ...(botType ? { businessType: botType } : { businessType: null }),
+          tone: botTone,
+          ...(botDescription ? { businessDescription: botDescription } : {}),
+          ...(botGreeting ? { greeting: botGreeting } : {}),
+        },
+      })
+      setBotMsg('Configuracoes do bot salvas!')
+    } catch (err: any) {
+      setBotError(err.message || 'Erro ao salvar')
+    }
   }
 
   const handleSaveNotifications = async (e: React.FormEvent) => {
@@ -298,6 +344,86 @@ export default function Settings() {
           </div>
         </Card>
       )}
+
+      {/* Bot / AI config */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Configuracao do Bot</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Defina o nicho e o comportamento do assistente de IA para este negocio.
+        </p>
+        <form onSubmit={handleSaveBotConfig} className="max-w-md space-y-4">
+          {botMsg && (
+            <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">{botMsg}</p>
+          )}
+          {botError && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{botError}</p>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo de Negocio (Nicho)
+            </label>
+            <select
+              value={botType}
+              onChange={(e) => setBotType(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              {BUSINESS_TYPES.map((bt) => (
+                <option key={bt.value} value={bt.value}>{bt.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Salao de cabelo, tatuagem e unhas ativam analise de fotos de referencia por IA.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tom do Bot</label>
+            <select
+              value={botTone}
+              onChange={(e) => setBotTone(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              {TONES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Descricao do Negocio
+            </label>
+            <textarea
+              value={botDescription}
+              onChange={(e) => setBotDescription(e.target.value)}
+              rows={3}
+              placeholder="Ex: Estudio especializado em tranças afro, box braids e penteados naturais no centro de Sao Paulo."
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Saudacao Inicial (opcional)
+            </label>
+            <input
+              type="text"
+              value={botGreeting}
+              onChange={(e) => setBotGreeting(e.target.value)}
+              placeholder="Ex: Ola! Bem-vinda ao Studio Afro Rosas. Como posso te ajudar?"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Salvar Configuracoes do Bot
+          </button>
+        </form>
+      </Card>
 
       {/* Notification config */}
       <Card>
