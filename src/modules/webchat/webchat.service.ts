@@ -159,6 +159,7 @@ export async function processWebMessage(
     try {
       const businessType = (tenant.aiConfig as any).businessType as string | undefined;
       const analysis = await analyzeVisualReference(imageBase64, imageMimeType ?? 'image/jpeg', businessType);
+      if (!analysis) throw new Error('Image analysis returned null');
       const analysisText = formatAnalysisForConversation(analysis, businessType);
       effectiveText = text ? `${analysisText}\n\n${text}` : analysisText;
     } catch (err) {
