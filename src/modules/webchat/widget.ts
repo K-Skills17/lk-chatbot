@@ -114,21 +114,43 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
       }
 
       #lk-chat-input-bar {
-        display: flex; border-top: 1px solid #e2e8f0; padding: 10px 12px; gap: 8px;
+        display: flex; flex-direction: column; border-top: 1px solid #e2e8f0; padding: 10px 12px; gap: 8px;
       }
+      #lk-chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
       #lk-chat-input {
         flex: 1; border: 1px solid #e2e8f0; border-radius: 10px;
         padding: 10px 14px; font-size: 14px; outline: none;
         font-family: inherit; resize: none; min-height: 20px; max-height: 80px;
       }
       #lk-chat-input:focus { border-color: \${c}; }
+      #lk-chat-img-btn {
+        background: none; border: 1px solid #e2e8f0; border-radius: 10px;
+        padding: 0 10px; height: 42px; cursor: pointer; color: #94a3b8;
+        display: flex; align-items: center; justify-content: center;
+        transition: color 0.2s, border-color 0.2s;
+      }
+      #lk-chat-img-btn:hover { color: \${c}; border-color: \${c}; }
+      #lk-chat-img-btn svg { width: 18px; height: 18px; }
       #lk-chat-send {
         background: \${c}; color: #fff; border: none; border-radius: 10px;
-        padding: 0 16px; cursor: pointer; font-size: 14px; font-weight: 600;
+        padding: 0 16px; height: 42px; cursor: pointer; font-size: 14px; font-weight: 600;
         white-space: nowrap;
       }
       #lk-chat-send:hover { background: \${darken(c, 20)}; }
       #lk-chat-send:disabled { opacity: 0.5; cursor: default; }
+      #lk-chat-img-preview {
+        display: none; align-items: center; gap: 8px;
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+        padding: 6px 10px; font-size: 12px; color: #64748b;
+      }
+      #lk-chat-img-preview.active { display: flex; }
+      #lk-chat-img-preview img { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; }
+      #lk-chat-img-remove {
+        background: none; border: none; color: #94a3b8; cursor: pointer;
+        font-size: 16px; line-height: 1; padding: 0; margin-left: auto;
+      }
+      #lk-chat-img-remove:hover { color: #ef4444; }
+      .lk-msg-img { max-width: 180px; border-radius: 8px; margin-bottom: 4px; display: block; }
 
       #lk-chat-powered {
         text-align: center; padding: 4px 0; font-size: 11px; color: #94a3b8;
@@ -172,19 +194,40 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
       </div>
       <div id="lk-chat-messages"></div>
       <div id="lk-chat-input-bar">
-        <input id="lk-chat-input" type="text" placeholder="Digite sua mensagem..." autocomplete="off" />
-        <button id="lk-chat-send" disabled>Enviar</button>
+        <div id="lk-chat-img-preview">
+          <img id="lk-chat-img-thumb" src="" alt="preview" />
+          <span id="lk-chat-img-name"></span>
+          <button id="lk-chat-img-remove" title="Remover imagem">&times;</button>
+        </div>
+        <div id="lk-chat-input-row">
+          <button id="lk-chat-img-btn" title="Enviar imagem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </button>
+          <input type="file" id="lk-chat-file-input" accept="image/*" style="display:none" />
+          <textarea id="lk-chat-input" placeholder="Digite sua mensagem..." autocomplete="off" rows="1"></textarea>
+          <button id="lk-chat-send" disabled>Enviar</button>
+        </div>
       </div>
       <div id="lk-chat-powered">Powered by <a href="https://lkdigital.odo.br" target="_blank" rel="noopener">LK Digital</a></div>
     \`;
     document.body.appendChild(win);
 
-    var messagesDiv = document.getElementById('lk-chat-messages');
-    var input       = document.getElementById('lk-chat-input');
-    var sendBtn     = document.getElementById('lk-chat-send');
-    var sessionId   = localStorage.getItem(SESSION_KEY);
-    var sending     = false;
-    var welcomed    = false;
+    var messagesDiv  = document.getElementById('lk-chat-messages');
+    var input        = document.getElementById('lk-chat-input');
+    var sendBtn      = document.getElementById('lk-chat-send');
+    var imgBtn       = document.getElementById('lk-chat-img-btn');
+    var fileInput    = document.getElementById('lk-chat-file-input');
+    var imgPreview   = document.getElementById('lk-chat-img-preview');
+    var imgThumb     = document.getElementById('lk-chat-img-thumb');
+    var imgName      = document.getElementById('lk-chat-img-name');
+    var imgRemove    = document.getElementById('lk-chat-img-remove');
+    var sessionId    = localStorage.getItem(SESSION_KEY);
+    var sending      = false;
+    var welcomed     = false;
+    var pendingImage = null; // { base64: string, mimeType: string, dataUrl: string, name: string }
 
     // ── Toggle ──────────────────────────────────────────────
     bubble.addEventListener('click', function() {
@@ -200,18 +243,58 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
     });
 
     // ── Input Handling ──────────────────────────────────────
-    input.addEventListener('input', function() {
-      sendBtn.disabled = !input.value.trim() || sending;
-    });
+    function updateSendBtn() {
+      sendBtn.disabled = (!input.value.trim() && !pendingImage) || sending;
+    }
+    input.addEventListener('input', updateSendBtn);
     input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
     sendBtn.addEventListener('click', send);
 
-    function addMessage(text, cls) {
+    // ── Image Handling ──────────────────────────────────────
+    imgBtn.addEventListener('click', function() { fileInput.click(); });
+
+    fileInput.addEventListener('change', function() {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) {
+        alert('Imagem muito grande. Máximo 8MB.');
+        fileInput.value = '';
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var dataUrl = e.target.result;
+        var base64 = dataUrl.split(',')[1];
+        pendingImage = { base64: base64, mimeType: file.type, dataUrl: dataUrl, name: file.name };
+        imgThumb.src = dataUrl;
+        imgName.textContent = file.name.length > 24 ? file.name.slice(0, 21) + '...' : file.name;
+        imgPreview.classList.add('active');
+        updateSendBtn();
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = '';
+    });
+
+    imgRemove.addEventListener('click', function() {
+      pendingImage = null;
+      imgPreview.classList.remove('active');
+      imgThumb.src = '';
+      updateSendBtn();
+    });
+
+    function addMessage(text, cls, imgDataUrl) {
       var div = document.createElement('div');
       div.className = 'lk-msg ' + cls;
-      div.innerHTML = text.replace(/(https?:\\/\\/[^\\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+      var html = '';
+      if (imgDataUrl) {
+        html += '<img class="lk-msg-img" src="' + imgDataUrl + '" alt="imagem enviada" />';
+      }
+      if (text) {
+        html += text.replace(/(https?:\\/\\/[^\\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+      }
+      div.innerHTML = html;
       messagesDiv.appendChild(div);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       return div;
@@ -221,7 +304,7 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
       if (welcomed) return;
       welcomed = true;
       if (cfg.welcomeMessage && messagesDiv.children.length === 0) {
-        addMessage(cfg.welcomeMessage, 'lk-msg-bot');
+        addMessage(cfg.welcomeMessage, 'lk-msg-bot', null);
       }
     }
 
@@ -249,7 +332,7 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
         if (data.messages && data.messages.length > 0) {
           welcomed = true;
           data.messages.forEach(function(m) {
-            addMessage(m.content, m.role === 'user' ? 'lk-msg-user' : 'lk-msg-bot');
+            addMessage(m.content, m.role === 'user' ? 'lk-msg-user' : 'lk-msg-bot', null);
           });
         } else {
           showWelcome();
@@ -257,24 +340,36 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
       })
       .catch(function(err) {
         console.error('LK Chat: session init failed', err);
-        addMessage('Não foi possível conectar ao assistente. Tente novamente.', 'lk-msg-bot');
+        addMessage('Não foi possível conectar ao assistente. Tente novamente.', 'lk-msg-bot', null);
       });
     }
 
     function send() {
       var text = input.value.trim();
-      if (!text || sending) return;
+      var image = pendingImage;
+      if (!text && !image || sending) return;
       sending = true;
       sendBtn.disabled = true;
       input.value = '';
 
-      addMessage(text, 'lk-msg-user');
-      var typing = addMessage('Digitando...', 'lk-msg-typing');
+      // Clear image preview
+      pendingImage = null;
+      imgPreview.classList.remove('active');
+      imgThumb.src = '';
+
+      addMessage(text, 'lk-msg-user', image ? image.dataUrl : null);
+      var typing = addMessage('Analisando...', 'lk-msg-typing');
+
+      var payload = { sessionId: sessionId, text: text };
+      if (image) {
+        payload.imageBase64 = image.base64;
+        payload.imageMimeType = image.mimeType;
+      }
 
       fetch(BASE_URL + '/api/webchat/' + TENANT_ID + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: sessionId, text: text })
+        body: JSON.stringify(payload)
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -295,7 +390,7 @@ export function getWidgetScript(tenantId: string, baseUrl: string): string {
       })
       .finally(function() {
         sending = false;
-        sendBtn.disabled = !input.value.trim();
+        updateSendBtn();
         input.focus();
       });
     }

@@ -71,17 +71,25 @@ export function registerWebChatRoutes(app: FastifyInstance): void {
   });
 
   // ── Send a message and get AI response ────────────────────
-  app.post('/api/webchat/:tenantId/message', async (request, reply) => {
+  app.post('/api/webchat/:tenantId/message', { bodyLimit: 10 * 1024 * 1024 }, async (request, reply) => {
     const { tenantId } = request.params as { tenantId: string };
-    const { sessionId, text } = request.body as { sessionId: string; text: string };
+    const { sessionId, text, imageBase64, imageMimeType } = request.body as {
+      sessionId: string;
+      text?: string;
+      imageBase64?: string;
+      imageMimeType?: string;
+    };
 
-    if (!sessionId || !text?.trim()) {
-      return reply.code(400).send({ error: 'sessionId and text are required' });
+    if (!sessionId) {
+      return reply.code(400).send({ error: 'sessionId is required' });
+    }
+    if (!text?.trim() && !imageBase64) {
+      return reply.code(400).send({ error: 'text or imageBase64 is required' });
     }
 
     try {
       const session = await getOrCreateSession(tenantId, sessionId);
-      const result = await processWebMessage(session, text.trim());
+      const result = await processWebMessage(session, text?.trim() ?? '', imageBase64, imageMimeType);
       return reply.send({
         reply: result.reply,
         sessionId: result.sessionId,

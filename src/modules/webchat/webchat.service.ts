@@ -6,6 +6,7 @@ import { getProvider, getModelForTier } from '../../ai/ai.router';
 import { buildSystemPrompt } from '../../ai/prompts/system.prompt';
 import { bookingService } from '../booking/booking.service';
 import { notificationService } from '../notification/notification.service';
+import { analyzeVisualReference, formatAnalysisForConversation } from '../../ai/vision/visual.analyzer';
 import {
   AiMessage,
   AiAction,
@@ -112,6 +113,8 @@ export interface WebChatResponse {
 export async function processWebMessage(
   session: WebChatSession,
   text: string,
+  imageBase64?: string,
+  imageMimeType?: string,
 ): Promise<WebChatResponse> {
   const { tenantId, contactId, conversationId } = session;
 
@@ -141,14 +144,28 @@ export async function processWebMessage(
       conversationId,
       tenantId,
       direction: 'inbound',
-      messageType: 'text',
-      content: text,
+      messageType: imageBase64 ? 'image' : 'text',
+      content: text || (imageBase64 ? '[imagem]' : ''),
       status: 'sent',
     },
   });
 
   // Load conversation history
   const history = await loadHistory(conversationId);
+
+  // If image was sent, analyze it via Claude Vision and prepend to user text
+  let effectiveText = text;
+  if (imageBase64) {
+    try {
+      const businessType = (tenant.aiConfig as any).businessType as string | undefined;
+      const analysis = await analyzeVisualReference(imageBase64, imageMimeType ?? 'image/jpeg', businessType);
+      const analysisText = formatAnalysisForConversation(analysis, businessType);
+      effectiveText = text ? `${analysisText}\n\n${text}` : analysisText;
+    } catch (err) {
+      logger.error({ err }, 'Web chat: image analysis failed, falling back to text only');
+      effectiveText = text || '[O usuário enviou uma imagem que não pôde ser analisada]';
+    }
+  }
 
   // Build system prompt
   const aiConfig = tenant.aiConfig as Record<string, any>;
@@ -189,7 +206,7 @@ export async function processWebMessage(
 
   const aiResponse = await provider.chat({
     systemPrompt,
-    messages: [...history, { role: 'user', content: text }],
+    messages: [...history, { role: 'user', content: effectiveText }],
     model,
     temperature: aiConfig.temperature ?? 0.7,
   });
