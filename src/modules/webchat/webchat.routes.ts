@@ -71,7 +71,7 @@ export function registerWebChatRoutes(app: FastifyInstance): void {
   });
 
   // ── Send a message and get AI response ────────────────────
-  app.post('/api/webchat/:tenantId/message', { bodyLimit: 10 * 1024 * 1024 }, async (request, reply) => {
+  app.post('/api/webchat/:tenantId/message', { bodyLimit: 15 * 1024 * 1024 }, async (request, reply) => {
     const { tenantId } = request.params as { tenantId: string };
     const { sessionId, text, imageBase64, imageMimeType } = request.body as {
       sessionId: string;

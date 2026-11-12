@@ -36,6 +36,7 @@ export async function buildApp() {
   const app = Fastify({
     logger: false, // We use our own pino instance
     trustProxy: true,
+    bodyLimit: 15 * 1024 * 1024, // 15 MB global limit (webchat image uploads need headroom for base64 overhead)
   });
 
   // ─── Allow empty-body JSON requests (e.g. DELETE with Content-Type header) ──
