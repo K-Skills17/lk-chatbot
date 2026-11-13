@@ -236,6 +236,51 @@ curl -X PATCH https://your-app.up.railway.app/api/tenants/TENANT_ID \
 | `escalationRules` | When to hand off to human | Prevents bot from handling sensitive topics |
 | `forbiddenTopics` | Topics the bot must refuse | Hard block on dangerous/irrelevant topics |
 
+## Niche-Specific Image Analysis (`aiConfig.businessType`)
+
+When a client sends a photo (WhatsApp or web chat), it is analysed by Claude Vision
+(`src/ai/vision/visual.analyzer.ts`). The prompt is chosen by the tenant's
+`aiConfig.businessType` (`src/ai/vision/visual.prompt.ts`, `NICHE_PROMPTS`), and the same
+value injects niche-specific rules into the chat system prompt.
+
+| `businessType` | Use for | Behaviour |
+|---|---|---|
+| `hairstylist` | Hair salons, braids | Identifies the style, time, complexity |
+| `tattoo` | Tattoo studios | Style, size, placement |
+| `nail_studio` | Nail studios | Shape, length, nail art |
+| `makeup` | Makeup artists | Look, occasion, palette |
+| `aesthetic_clinic` | Aesthetic / medical-aesthetic clinics | Acknowledges the photo neutrally. **Never** diagnoses, judges appearance, estimates age or suggests a treatment, dose or number of sessions. States that any indication is defined in an in-person evaluation with the responsible professional (CFM Res. 2.336/2023) and offers to schedule it. Refuses photos of minors and intimate images. |
+| `planned_furniture` | Móveis planejados | Describes the room, asks for measurements and needs, guides to a measurement visit or quote. Never gives a price from a photo. |
+| *(unset / unknown)* | Everything else | Generic "describe what you see" prompt |
+
+> **Required:** the Vitrini72 **estética demo** and **ÁUREA** tenants MUST have
+> `aiConfig.businessType = "aesthetic_clinic"`. Without it they fall back to the generic
+> prompt, which may comment on the visitor's face/skin or imply a treatment indication.
+> The value is **not validated** — a typo (e.g. `aesthetic-clinic`) silently falls back to
+> generic, so verify it after setting.
+
+**Option A — script** (matches tenant by partial `businessName`):
+
+```bash
+npx tsx scripts/set-business-type.ts "ÁUREA" aesthetic_clinic
+npx tsx scripts/set-business-type.ts "Estética" aesthetic_clinic
+npx tsx scripts/set-business-type.ts "Planejados" planned_furniture
+```
+
+**Option B — portal admin API** (superadmin JWT):
+
+```bash
+curl -X PATCH https://YOUR-APP/api/portal-admin/tenants/TENANT_ID \
+  -H "Authorization: Bearer SUPERADMIN_JWT" -H "Content-Type: application/json" \
+  -d '{"businessType": "aesthetic_clinic"}'
+```
+
+**Option C — at creation:** include `"businessType": "aesthetic_clinic"` inside `aiConfig`
+in the `POST /api/tenants` body (Step 3).
+
+Verify with `GET /api/portal-admin/tenants` — the tenant's `aiConfig.businessType` must
+read exactly `aesthetic_clinic`. Pass an empty value to the script to reset to generic.
+
 ## Troubleshooting
 
 ### Messages not arriving at my app

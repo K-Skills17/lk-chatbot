@@ -10,9 +10,11 @@
  *   npx tsx scripts/set-business-type.ts "Tattoo SP" tattoo
  *   npx tsx scripts/set-business-type.ts "Nail Art Studio" nail_studio
  *   npx tsx scripts/set-business-type.ts "Maquiagem Pro" makeup
+ *   npx tsx scripts/set-business-type.ts "ÁUREA" aesthetic_clinic
+ *   npx tsx scripts/set-business-type.ts "Planejados Demo" planned_furniture
  *
  * Supported businessType values:
- *   hairstylist | tattoo | nail_studio | makeup
+ *   hairstylist | tattoo | nail_studio | makeup | aesthetic_clinic | planned_furniture
  *   (omit to reset to generic visual analysis)
  */
 import { PrismaClient } from '../src/generated/prisma/client';

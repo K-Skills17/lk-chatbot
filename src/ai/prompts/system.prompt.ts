@@ -125,7 +125,7 @@ export function buildSystemPrompt(
 
   parts.push(buildIdentity(tenant.businessName, tenant.aiConfig.tone));
 
-  // Inject niche-specific instructions when businessType is set (hairstylist, tattoo, nail_studio, makeup, etc.)
+  // Inject niche-specific instructions when businessType is set (hairstylist, tattoo, nail_studio, makeup, aesthetic_clinic, planned_furniture, etc.)
   const businessType = (tenant.aiConfig as any).businessType as string | undefined;
   if (businessType) {
     const { botInstructions } = getPromptForNiche(businessType);

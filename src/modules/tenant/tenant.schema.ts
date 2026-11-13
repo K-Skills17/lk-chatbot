@@ -34,6 +34,9 @@ export const createTenantSchema = z.object({
       })).optional(),
       targetAudience: z.string().optional(),           // Who the business serves
       tone: z.enum(['formal', 'casual', 'friendly']).default('friendly'),
+      // Selects the niche-specific image-analysis prompt and bot rules
+      // (see src/ai/vision/visual.prompt.ts — e.g. "aesthetic_clinic", "planned_furniture")
+      businessType: z.string().optional(),
       greeting: z.string().optional(),                 // Custom first-message greeting
       closingMessage: z.string().optional(),           // Custom goodbye message
       escalationRules: z.string().optional(),          // When to escalate to human

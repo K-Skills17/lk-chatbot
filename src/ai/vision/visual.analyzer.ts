@@ -17,6 +17,8 @@ export interface VisualAnalysis {
   // Niche-specific fields (present depending on businessType)
   [key: string]: unknown;
   error?: string;
+  /** aesthetic_clinic only: set when the image must not be analysed */
+  refused?: 'minor' | 'intimate' | string;
 }
 
 let _client: Anthropic | null = null;
@@ -31,7 +33,8 @@ function getClient(): Anthropic {
 /**
  * Analyzes a reference image using Claude Vision.
  * The businessType parameter selects the right niche-specific analysis prompt
- * (hairstylist, tattoo, nail_studio, makeup, or generic default).
+ * (hairstylist, tattoo, nail_studio, makeup, aesthetic_clinic, planned_furniture,
+ * or generic default).
  *
  * Returns structured analysis data, or null if the call fails.
  */
@@ -105,6 +108,10 @@ export function formatAnalysisForConversation(
   analysis: VisualAnalysis,
   businessType?: string,
 ): string {
+  if (businessType === 'aesthetic_clinic') {
+    return formatAestheticClinicAnalysis(analysis);
+  }
+
   if (analysis.error) {
     return '[Cliente enviou uma imagem que não corresponde ao tipo de serviço]';
   }
@@ -147,16 +154,68 @@ export function formatAnalysisForConversation(
       lines.push(`Foco: ${(analysis.keyProducts as string[]).join(', ')}`);
     }
     if (analysis.artistNotes) lines.push(`Notas técnicas: ${analysis.artistNotes as string}`);
+  } else if (businessType === 'planned_furniture') {
+    if (analysis.roomType) lines.push(`Ambiente: ${analysis.roomType as string}`);
+    if (Array.isArray(analysis.visibleElements) && (analysis.visibleElements as string[]).length > 0) {
+      lines.push(`Elementos visíveis: ${(analysis.visibleElements as string[]).join(', ')}`);
+    }
+    if (analysis.styleNotes) lines.push(`Estilo: ${analysis.styleNotes as string}`);
+    if (analysis.projectNotes) lines.push(`Notas para o projeto: ${analysis.projectNotes as string}`);
   }
 
   lines.push('', `Resumo: ${analysis.summary}`);
 
-  if (analysis.followUpQuestions.length > 0) {
+  if (Array.isArray(analysis.followUpQuestions) && analysis.followUpQuestions.length > 0) {
     lines.push('', 'Perguntas sugeridas:');
     for (const q of analysis.followUpQuestions) {
       lines.push(`- ${q}`);
     }
   }
 
+  return lines.join('\n');
+}
+
+/**
+ * Aesthetic clinics: only whitelisted, neutral fields reach the conversation.
+ * Anything else the model may have returned (skin type, age, conditions,
+ * treatments, time/complexity estimates) is dropped on purpose — see
+ * CFM Resolução 2.336/2023 (no indication outside an in-person evaluation).
+ */
+function formatAestheticClinicAnalysis(analysis: VisualAnalysis): string {
+  const policyReminder =
+    'Lembrete: não comentar a aparência, não diagnosticar e não indicar tratamento; ' +
+    'a indicação é definida somente na avaliação presencial com o profissional responsável. ' +
+    'Oferecer o agendamento da avaliação.';
+
+  if (analysis.refused === 'minor') {
+    return [
+      '[Cliente enviou uma imagem que não pode ser analisada: possível menor de idade]',
+      'Não descrever a imagem. Informar com educação que não analisamos fotos de menores de idade ' +
+        'e oferecer avaliação presencial com a presença de um responsável legal.',
+    ].join('\n');
+  }
+  if (analysis.refused) {
+    return [
+      '[Cliente enviou uma imagem que não pode ser analisada: conteúdo íntimo]',
+      'Não descrever a imagem. Informar com educação que não analisamos imagens íntimas ' +
+        'e oferecer a avaliação presencial.',
+    ].join('\n');
+  }
+  if (analysis.error) {
+    return `[Cliente enviou uma imagem]\n${policyReminder}`;
+  }
+
+  const lines: string[] = ['[Cliente enviou uma foto]', ''];
+  if (typeof analysis.imageKind === 'string' && analysis.imageKind) {
+    lines.push(`Tipo de imagem: ${analysis.imageKind}`);
+  }
+  if (typeof analysis.summary === 'string' && analysis.summary) {
+    lines.push('', `Resumo: ${analysis.summary}`);
+  }
+  if (Array.isArray(analysis.followUpQuestions) && analysis.followUpQuestions.length > 0) {
+    lines.push('', 'Perguntas sugeridas:');
+    for (const q of analysis.followUpQuestions) lines.push(`- ${q}`);
+  }
+  lines.push('', policyReminder);
   return lines.join('\n');
 }
